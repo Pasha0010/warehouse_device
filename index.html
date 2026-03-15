@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta name="theme-color" content="#121212">
+  <title>Склад пиротехники</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            dark: { bg: '#121212', surface: '#1e1e1e' },
+            accent: { orange: '#ff9f43', purple: '#5f27cd' }
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    :root {
+      --bg-dark: #121212;
+      --surface: #1e1e1e;
+      --accent-orange: #ff9f43;
+      --accent-purple: #5f27cd;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      background: var(--bg-dark);
+      color: #e0e0e0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+      padding-bottom: env(safe-area-inset-bottom, 0);
+      padding-left: env(safe-area-inset-left, 0);
+      padding-right: env(safe-area-inset-right, 0);
+    }
+    .touch-target {
+      min-height: 48px;
+      min-width: 48px;
+      touch-action: manipulation;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+    input, select, button, .btn {
+      touch-action: manipulation;
+      min-height: 48px;
+    }
+    .card-expiring { border: 2px solid #e74c3c !important; }
+    .modal-backdrop { background: rgba(0,0,0,0.7); }
+    .view { display: none; }
+    .view.active { display: block; }
+    #app-footer {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      padding: 8px 16px;
+      padding-bottom: calc(8px + env(safe-area-inset-bottom, 0));
+      background: var(--surface);
+      border-top: 1px solid #333;
+      font-size: 12px;
+      color: #888;
+      text-align: center;
+    }
+    .content-wrap { padding-bottom: 60px; }
+    .svg-icon { width: 24px; height: 24px; fill: currentColor; }
+    .pb-safe { padding-bottom: env(safe-area-inset-bottom, 0); }
+  </style>
+</head>
+<body class="overflow-x-hidden">
+  <div id="app">
+    <!-- Onboarding View (first launch: no warehouses yet) -->
+    <div id="view-onboarding" class="view min-h-screen p-4 content-wrap">
+      <div class="max-w-md mx-auto pt-8">
+        <h1 class="text-2xl font-bold mb-2" style="color: var(--accent-orange);">Добро пожаловать!</h1>
+        <p class="text-gray-400 mb-8 text-lg">Создайте свой первый склад. Затем сможете добавлять товары и вести учёт.</p>
+        <button id="onboarding-go-settings" class="touch-target w-full rounded-lg font-medium text-white py-4" style="background: var(--accent-purple);">
+          Настроить склад
+        </button>
+      </div>
+    </div>
+
+    <!-- Home View -->
+    <div id="view-home" class="view min-h-screen content-wrap">
+      <header class="sticky top-0 z-10 p-4 pb-2" style="background: var(--bg-dark);">
+        <div class="flex items-center justify-between mb-3">
+          <h1 class="text-xl font-bold" style="color: var(--accent-orange);">Склад пиротехники</h1>
+          <button id="btn-settings" class="touch-target p-2 rounded-lg" style="background: var(--surface);" aria-label="Настройки">
+            <svg class="svg-icon" viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.31.06-.63.06-.94 0-.31-.02-.63-.06-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.04.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
+          </button>
+        </div>
+        <input type="search" id="search-input" placeholder="Например: Салют или Петарда..."
+          class="w-full px-4 py-3 rounded-lg mb-2 touch-target bg-gray-800 border border-gray-600 text-white placeholder-gray-500">
+        <div class="flex gap-2 overflow-x-auto pb-2 -mx-4 px-4" style="-webkit-overflow-scrolling: touch;">
+          <select id="filter-warehouse" class="flex-1 min-w-0 px-3 rounded-lg bg-gray-800 border border-gray-600 text-white text-sm touch-target">
+            <option value="">Все склады</option>
+          </select>
+          <select id="filter-category" class="flex-1 min-w-0 px-3 rounded-lg bg-gray-800 border border-gray-600 text-white text-sm touch-target">
+            <option value="">Все категории</option>
+          </select>
+        </div>
+      </header>
+      <main class="p-4 pb-24">
+        <div id="items-list" class="space-y-3"></div>
+        <div id="items-empty" class="text-center py-12 text-gray-500 hidden">Нет позиций. Добавьте первую.</div>
+      </main>
+      <!-- Thumb zone: Add Item button fixed at bottom -->
+      <div class="fixed left-0 right-0 p-4 pb-safe" style="bottom: calc(52px + env(safe-area-inset-bottom, 0)); background: linear-gradient(transparent, var(--bg-dark) 24px);">
+        <button id="btn-add-item" class="touch-target w-full rounded-xl font-medium text-white py-4 flex items-center justify-center gap-2 shadow-lg" style="background: var(--accent-purple); min-height: 52px;">
+          <svg class="svg-icon" viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+          Добавить позицию
+        </button>
+      </div>
+    </div>
+
+    <!-- Item Modal (Add/Edit): scrollable form + sticky save bar (keyboard-safe) -->
+    <div id="modal-item" class="fixed inset-0 z-20 hidden">
+      <div class="modal-backdrop absolute inset-0" id="modal-item-backdrop"></div>
+      <div class="absolute inset-0 flex flex-col inset-x-4 mx-auto max-w-lg rounded-xl overflow-hidden" style="top: 5%; bottom: 5%; background: var(--surface);">
+        <div class="flex-shrink-0 p-4 border-b border-gray-700">
+          <h2 id="modal-item-title" class="text-lg font-bold">Добавить позицию</h2>
+        </div>
+        <div id="modal-item-no-warehouses" class="hidden p-4 text-center">
+          <p class="text-gray-400 mb-4">Сначала создайте склад в настройках.</p>
+          <button type="button" id="modal-item-goto-settings" class="touch-target w-full rounded-lg font-medium text-white py-3" style="background: var(--accent-purple);">Перейти в настройки</button>
+        </div>
+        <form id="form-item" class="flex flex-col flex-1 min-h-0 hidden">
+          <div class="flex-1 overflow-y-auto p-4 space-y-4">
+            <input type="hidden" id="item-id">
+            <div>
+              <label class="block text-base font-medium text-gray-300 mb-2">Название</label>
+              <input type="text" id="item-name" required placeholder="Например: Салют «Праздничный»"
+                class="w-full px-4 rounded-lg bg-gray-800 border border-gray-600 text-white touch-target">
+            </div>
+            <div>
+              <label class="block text-base font-medium text-gray-300 mb-2">Категория</label>
+              <select id="item-category" class="w-full px-4 rounded-lg bg-gray-800 border border-gray-600 text-white touch-target">
+                <option value="Салюты">Салюты</option>
+                <option value="Римские свечи">Римские свечи</option>
+                <option value="Петарды">Петарды</option>
+                <option value="Фонтаны">Фонтаны</option>
+                <option value="Бенгальские огни">Бенгальские огни</option>
+                <option value="Хлопушки">Хлопушки</option>
+                <option value="Другое">Другое</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-base font-medium text-gray-300 mb-2">Где хранится?</label>
+              <select id="item-warehouse" class="w-full px-4 rounded-lg bg-gray-800 border border-gray-600 text-white touch-target">
+              </select>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-base font-medium text-gray-300 mb-2">Сколько осталось?</label>
+                <input type="number" id="item-quantity" min="0" step="1" required placeholder="0"
+                  class="w-full px-4 rounded-lg bg-gray-800 border border-gray-600 text-white touch-target">
+              </div>
+              <div>
+                <label class="block text-base font-medium text-gray-300 mb-2">Единица</label>
+                <select id="item-unit" class="w-full px-4 rounded-lg bg-gray-800 border border-gray-600 text-white touch-target">
+                  <option value="шт">шт</option>
+                  <option value="кг">кг</option>
+                  <option value="коробок">коробок</option>
+                  <option value="упаковок">упаковок</option>
+                  <option value="метров">метров</option>
+                </select>
+              </div>
+            </div>
+            <div>
+              <label class="block text-base font-medium text-gray-300 mb-2">Срок годности</label>
+              <input type="date" id="item-expiration" placeholder="Год-месяц-день"
+                class="w-full px-4 rounded-lg bg-gray-800 border border-gray-600 text-white touch-target">
+            </div>
+            <div class="h-4"></div>
+          </div>
+          <div class="flex-shrink-0 p-4 pt-2 border-t border-gray-700 flex gap-2" style="padding-bottom: calc(16px + env(safe-area-inset-bottom, 0));">
+            <button type="submit" class="flex-1 touch-target rounded-lg font-medium text-white py-3" style="background: var(--accent-orange);">Сохранить</button>
+            <button type="button" id="modal-item-cancel" class="flex-1 touch-target rounded-lg border border-gray-600 text-gray-300 py-3">Отмена</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Settings View -->
+    <div id="view-settings" class="view min-h-screen p-4 pb-28 content-wrap">
+      <header class="flex items-center gap-3 mb-6">
+        <button id="btn-back-settings" class="touch-target p-2 rounded-lg" style="background: var(--surface);" aria-label="Назад">
+          <svg class="svg-icon" viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+        </button>
+        <h1 class="text-xl font-bold" style="color: var(--accent-orange);">Настройки</h1>
+      </header>
+      <section class="mb-6">
+        <h2 class="text-base font-medium text-gray-300 mb-3">Склады</h2>
+        <div id="settings-warehouses-list" class="space-y-2 mb-3"></div>
+        <div class="flex gap-2">
+          <input type="text" id="settings-new-warehouse" placeholder="Например: Основной склад или Магазин"
+            class="flex-1 px-4 rounded-lg bg-gray-800 border border-gray-600 text-white touch-target">
+          <button id="settings-add-warehouse" class="touch-target px-4 rounded-lg text-white shrink-0" style="background: var(--accent-purple);">Добавить</button>
+        </div>
+      </section>
+      <section class="mb-6">
+        <h2 class="text-sm font-medium text-gray-400 mb-3">Резервная копия</h2>
+        <div class="flex flex-col gap-2">
+          <button id="btn-export" class="touch-target w-full rounded-lg border border-gray-600 text-gray-300">Экспорт в JSON</button>
+          <label class="touch-target w-full rounded-lg border border-gray-600 text-gray-300 flex items-center justify-center cursor-pointer">
+            <input type="file" id="input-import" accept=".json" class="hidden"> Импорт из JSON
+          </label>
+        </div>
+      </section>
+      <section>
+        <button id="btn-clear-all" class="touch-target w-full rounded-lg border border-red-600 text-red-400">Очистить все данные</button>
+      </section>
+      <!-- Thumb zone: quick add warehouse -->
+      <div class="fixed left-0 right-0 p-4 pb-safe" style="bottom: calc(52px + env(safe-area-inset-bottom, 0)); background: linear-gradient(transparent, var(--bg-dark) 24px);">
+        <button type="button" id="settings-focus-add-warehouse" class="touch-target w-full rounded-xl font-medium text-white py-4 shadow-lg" style="background: var(--accent-purple); min-height: 52px;">Добавить склад</button>
+      </div>
+    </div>
+  </div>
+
+  <footer id="app-footer">⚠️ Храните в сухом месте вдали от огня.</footer>
+
+  <script>
+(function() {
+  const STORAGE_KEY = 'pyro_inventory_db';
+  const UNITS = ['шт', 'кг', 'коробок', 'упаковок', 'метров'];
+  const CATEGORIES = ['Салюты', 'Римские свечи', 'Петарды', 'Фонтаны', 'Бенгальские огни', 'Хлопушки', 'Другое'];
+  const EXPIRY_WARN_DAYS = 30;
+
+  function getDb() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return null;
+      return JSON.parse(raw);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function saveDb(data) {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function initDb() {
+    const db = getDb();
+    if (db && Array.isArray(db.warehouses) && Array.isArray(db.items)) return db;
+    return { warehouses: [], items: [] };
+  }
+
+  function ensureDb() {
+    let db = getDb();
+    if (!db || !Array.isArray(db.warehouses)) db = { warehouses: [], items: [] };
+    if (!Array.isArray(db.items)) db.items = [];
+    saveDb(db);
+    return db;
+  }
+
+  function showView(viewId) {
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    const el = document.getElementById(viewId);
+    if (el) el.classList.add('active');
+  }
+
+  function generateId() {
+    return Math.floor(10000000 + Math.random() * 90000000);
+  }
+
+  function daysUntil(dateStr) {
+    if (!dateStr) return null;
+    const d = new Date(dateStr);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    d.setHours(0, 0, 0, 0);
+    return Math.ceil((d - today) / (1000 * 60 * 60 * 24));
+  }
+
+  function isExpiringSoon(dateStr) {
+    const days = daysUntil(dateStr);
+    return days !== null && days >= 0 && days < EXPIRY_WARN_DAYS;
+  }
+
+  // --- Onboarding (first launch: no warehouses; user creates them in Settings) ---
+  function runOnboarding() {
+    const db = getDb();
+    const hasWarehouses = db && Array.isArray(db.warehouses) && db.warehouses.length > 0;
+    if (hasWarehouses) {
+      showView('view-home');
+      renderHome();
+      return;
+    }
+    showView('view-onboarding');
+    document.getElementById('onboarding-go-settings').onclick = () => {
+      showView('view-settings');
+      renderSettings();
+    };
+  }
+
+  // --- Home: list & filters ---
+  function renderHome() {
+    const db = ensureDb();
+    const search = (document.getElementById('search-input').value || '').toLowerCase().trim();
+    const filterWh = (document.getElementById('filter-warehouse').value || '').trim();
+    const filterCat = (document.getElementById('filter-category').value || '').trim();
+
+    let items = db.items.filter(it => {
+      const matchSearch = !search || it.name.toLowerCase().includes(search);
+      const matchWh = !filterWh || it.warehouse === filterWh;
+      const matchCat = !filterCat || it.category === filterCat;
+      return matchSearch && matchWh && matchCat;
+    });
+
+    const listEl = document.getElementById('items-list');
+    const emptyEl = document.getElementById('items-empty');
+    listEl.innerHTML = '';
+    emptyEl.classList.add('hidden');
+
+    const warehouseSelect = document.getElementById('filter-warehouse');
+    warehouseSelect.innerHTML = '<option value="">Все склады</option>';
+    (db.warehouses || []).forEach(w => {
+      warehouseSelect.appendChild(new Option(w, w));
+    });
+    const categorySelect = document.getElementById('filter-category');
+    categorySelect.innerHTML = '<option value="">Все категории</option>';
+    CATEGORIES.forEach(c => {
+      categorySelect.appendChild(new Option(c, c));
+    });
+
+    if (items.length === 0) {
+      emptyEl.classList.remove('hidden');
+      return;
+    }
+
+    items.forEach(item => {
+      const card = document.createElement('div');
+      const expiring = isExpiringSoon(item.expiration);
+      card.className = 'rounded-xl p-4 border ' + (expiring ? 'card-expiring' : 'border-gray-700');
+      card.style.background = 'var(--surface)';
+      const days = daysUntil(item.expiration);
+      let expText = item.expiration ? (days !== null ? (days < 0 ? 'Просрочено' : `До ${days} дн.`) : item.expiration) : '—';
+      card.innerHTML = `
+        <div class="flex justify-between items-start gap-2 mb-2">
+          <h3 class="font-medium text-white break-words">${escapeHtml(item.name)}</h3>
+          <span class="text-sm text-gray-400 shrink-0">${escapeHtml(item.warehouse)}</span>
+        </div>
+        <div class="flex items-center justify-between flex-wrap gap-2">
+          <div class="flex items-center gap-2">
+            <span class="text-lg font-semibold" style="color: var(--accent-orange);">${item.quantity} ${escapeHtml(item.unit)}</span>
+            <span class="text-sm text-gray-500">${escapeHtml(item.category)}</span>
+          </div>
+          <div class="text-sm text-gray-400">${expText}</div>
+        </div>
+        <div class="flex gap-2 mt-3">
+          <button data-action="dec" data-id="${item.id}" class="touch-target flex-1 rounded-lg border border-gray-600 text-gray-300 text-sm">−</button>
+          <button data-action="inc" data-id="${item.id}" class="touch-target flex-1 rounded-lg border border-gray-600 text-gray-300 text-sm">+</button>
+          <button data-action="edit" data-id="${item.id}" class="touch-target p-2 rounded-lg text-white" style="background: var(--accent-purple);">Изм.</button>
+          <button data-action="del" data-id="${item.id}" class="touch-target p-2 rounded-lg border border-red-600 text-red-400">Удал.</button>
+        </div>
+      `;
+      card.querySelector('[data-action="dec"]').onclick = () => adjustQuantity(item.id, -1);
+      card.querySelector('[data-action="inc"]').onclick = () => adjustQuantity(item.id, 1);
+      card.querySelector('[data-action="edit"]').onclick = () => openItemModal(item.id);
+      card.querySelector('[data-action="del"]').onclick = () => deleteItem(item.id);
+      listEl.appendChild(card);
+    });
+  }
+
+  function escapeHtml(s) {
+    if (s == null) return '';
+    const div = document.createElement('div');
+    div.textContent = s;
+    return div.innerHTML;
+  }
+
+  function adjustQuantity(id, delta) {
+    const db = ensureDb();
+    const item = db.items.find(i => i.id === id);
+    if (!item) return;
+    item.quantity = Math.max(0, (item.quantity || 0) + delta);
+    saveDb(db);
+    renderHome();
+  }
+
+  function deleteItem(id) {
+    if (!confirm('Удалить эту позицию?')) return;
+    const db = ensureDb();
+    db.items = db.items.filter(i => i.id !== id);
+    saveDb(db);
+    renderHome();
+  }
+
+  // --- Item Modal ---
+  function openItemModal(editId) {
+    const db = ensureDb();
+    const warehouses = db.warehouses || [];
+    const noWhEl = document.getElementById('modal-item-no-warehouses');
+    const formEl = document.getElementById('form-item');
+
+    if (warehouses.length === 0) {
+      noWhEl.classList.remove('hidden');
+      formEl.classList.add('hidden');
+      document.getElementById('modal-item').classList.remove('hidden');
+      return;
+    }
+    noWhEl.classList.add('hidden');
+    formEl.classList.remove('hidden');
+
+    const whSelect = document.getElementById('item-warehouse');
+    whSelect.innerHTML = '';
+    warehouses.forEach(w => whSelect.appendChild(new Option(w, w)));
+
+    if (editId) {
+      const item = db.items.find(i => i.id === editId);
+      if (!item) return;
+      document.getElementById('modal-item-title').textContent = 'Изменить позицию';
+      document.getElementById('item-id').value = item.id;
+      document.getElementById('item-name').value = item.name || '';
+      document.getElementById('item-category').value = item.category || 'Салюты';
+      document.getElementById('item-warehouse').value = item.warehouse || warehouses[0];
+      document.getElementById('item-quantity').value = item.quantity ?? 0;
+      document.getElementById('item-unit').value = item.unit || 'шт';
+      document.getElementById('item-expiration').value = item.expiration || '';
+    } else {
+      document.getElementById('modal-item-title').textContent = 'Добавить позицию';
+      document.getElementById('form-item').reset();
+      document.getElementById('item-id').value = '';
+      document.getElementById('item-warehouse').value = warehouses[0];
+      document.getElementById('item-quantity').value = 0;
+      document.getElementById('item-unit').value = 'шт';
+      document.getElementById('item-expiration').value = '';
+    }
+    document.getElementById('modal-item').classList.remove('hidden');
+  }
+
+  function closeItemModal() {
+    document.getElementById('modal-item').classList.add('hidden');
+  }
+
+  document.getElementById('form-item').onsubmit = (e) => {
+    e.preventDefault();
+    const db = ensureDb();
+    const idVal = document.getElementById('item-id').value;
+    const warehouses = db.warehouses || [];
+    const payload = {
+      id: idVal ? parseInt(idVal, 10) : generateId(),
+      name: (document.getElementById('item-name').value || '').trim(),
+      category: document.getElementById('item-category').value || 'Салюты',
+      warehouse: document.getElementById('item-warehouse').value || (warehouses[0] || ''),
+      quantity: parseInt(document.getElementById('item-quantity').value, 10) || 0,
+      unit: document.getElementById('item-unit').value || 'шт',
+      expiration: (document.getElementById('item-expiration').value || '').trim()
+    };
+    if (!payload.name) return;
+    const idx = db.items.findIndex(i => i.id === payload.id);
+    if (idx >= 0) db.items[idx] = payload;
+    else db.items.push(payload);
+    saveDb(db);
+    closeItemModal();
+    renderHome();
+  };
+
+  document.getElementById('modal-item-cancel').onclick = closeItemModal;
+  document.getElementById('modal-item-backdrop').onclick = closeItemModal;
+  document.getElementById('modal-item-goto-settings').onclick = () => {
+    closeItemModal();
+    showView('view-settings');
+    renderSettings();
+  };
+
+  // --- Settings ---
+  function renderSettings() {
+    const db = ensureDb();
+    const list = document.getElementById('settings-warehouses-list');
+    list.innerHTML = '';
+    (db.warehouses || []).forEach((w, i) => {
+      const row = document.createElement('div');
+      row.className = 'flex items-center justify-between gap-2 p-3 rounded-lg';
+      row.style.background = 'var(--bg-dark)';
+      row.innerHTML = `
+        <span class="text-white flex-1 min-w-0 truncate">${escapeHtml(w)}</span>
+        <button data-rename="${i}" class="touch-target px-3 py-2 rounded border border-gray-600 text-gray-300 text-sm shrink-0">Переименовать</button>
+        <button data-delete="${i}" class="touch-target px-3 py-2 rounded text-red-400 text-sm shrink-0">Удалить</button>
+      `;
+      row.querySelector('[data-rename]').onclick = () => {
+        const newName = (prompt('Новое название склада:', w) || '').trim();
+        if (!newName || newName === w) return;
+        if (db.warehouses.includes(newName)) {
+          alert('Такой склад уже есть.');
+          return;
+        }
+        const oldName = db.warehouses[i];
+        db.warehouses[i] = newName;
+        db.items.forEach(it => { if (it.warehouse === oldName) it.warehouse = newName; });
+        saveDb(db);
+        renderSettings();
+        renderHome();
+      };
+      row.querySelector('[data-delete]').onclick = () => {
+        if (!confirm(`Удалить склад «${w}»? Позиции этого склада останутся в списке без склада.`)) return;
+        db.warehouses.splice(i, 1);
+        saveDb(db);
+        renderSettings();
+        renderHome();
+      };
+      list.appendChild(row);
+    });
+    document.getElementById('settings-new-warehouse').value = '';
+  }
+
+  document.getElementById('settings-add-warehouse').onclick = () => {
+    const input = document.getElementById('settings-new-warehouse');
+    const name = (input.value || '').trim();
+    if (!name) return;
+    const db = ensureDb();
+    if (!db.warehouses) db.warehouses = [];
+    if (db.warehouses.includes(name)) {
+      alert('Такой склад уже есть.');
+      return;
+    }
+    db.warehouses.push(name);
+    saveDb(db);
+    input.value = '';
+    renderSettings();
+    renderHome();
+  };
+  document.getElementById('settings-focus-add-warehouse').onclick = () => {
+    const input = document.getElementById('settings-new-warehouse');
+    input.focus();
+    input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  };
+
+  document.getElementById('btn-export').onclick = () => {
+    const db = getDb() || { warehouses: [], items: [] };
+    const blob = new Blob([JSON.stringify(db, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'pyro_inventory_backup.json';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+
+  document.getElementById('input-import').onchange = (e) => {
+    const f = e.target.files[0];
+    if (!f) return;
+    const r = new FileReader();
+    r.onload = () => {
+      try {
+        const data = JSON.parse(r.result);
+        if (!data || (!Array.isArray(data.warehouses) && !Array.isArray(data.items))) {
+          alert('Неверный формат файла.');
+          return;
+        }
+        const db = {
+          warehouses: Array.isArray(data.warehouses) ? data.warehouses : [],
+          items: Array.isArray(data.items) ? data.items : []
+        };
+        saveDb(db);
+        alert('Данные импортированы.');
+        showView('view-home');
+        renderHome();
+      } catch (err) {
+        alert('Ошибка чтения файла.');
+      }
+      e.target.value = '';
+    };
+    r.readAsText(f);
+  };
+
+  document.getElementById('btn-clear-all').onclick = () => {
+    if (!confirm('Удалить ВСЕ данные без возможности восстановления?')) return;
+    localStorage.removeItem(STORAGE_KEY);
+    showView('view-onboarding');
+    runOnboarding();
+  };
+
+  document.getElementById('btn-back-settings').onclick = () => {
+    const db = ensureDb();
+    if (!db.warehouses || db.warehouses.length === 0) {
+      showView('view-onboarding');
+      runOnboarding();
+    } else {
+      showView('view-home');
+      renderHome();
+    }
+  };
+
+  // --- Events: Home ---
+  document.getElementById('btn-settings').onclick = () => {
+    showView('view-settings');
+    renderSettings();
+  };
+
+  document.getElementById('btn-add-item').onclick = () => openItemModal(null);
+
+  document.getElementById('search-input').oninput = renderHome;
+  document.getElementById('search-input').onchange = renderHome;
+  document.getElementById('filter-warehouse').onchange = renderHome;
+  document.getElementById('filter-category').onchange = renderHome;
+
+  // --- Init ---
+  function init() {
+    ensureDb();
+    runOnboarding();
+  }
+  init();
+})();
+  </script>
+</body>
+</html>
